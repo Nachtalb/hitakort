@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw
 
-from hitakort.defaults import CWD
+from hitakort.defaults import CWD, HIT_REGEX
 
 
 class HitaKort:
@@ -29,11 +29,10 @@ class HitaKort:
     """
 
     def __init__(self, file_path: Path = CWD, grid_size: int = 6, override_size: bool = True) -> None:
-        if file_path.is_dir():
-            if not file_path.exists():
-                file_path.mkdir(parents=True, exist_ok=True)
+        if not file_path.suffix:
             file_path = file_path / "heatmap_data.json"
 
+        file_path.parent.mkdir(parents=True, exist_ok=True)
         if not file_path.exists():
             file_path.write_text("{}")
 
@@ -110,22 +109,21 @@ class HitaKort:
             point (str): Input point in various formats (e.g., 'A1', '1a', 'AAZ123', '123AAZ').
 
         Returns:
-            str: Normalized point with letters first (lowercase) followed by numbers.
+            str: Normalized point with letters first (uppercase) followed by numbers.
 
         Raises:
             ValueError: If the input point is invalid.
         """
-        pattern = r"^(?P<letters>[a-zA-Z]+)(?P<numbers>\d+)$|^(?P<numbers_first>\d+)(?P<letters_second>[a-zA-Z]+)$"
-        match = re.match(pattern, point)
+        match = re.match(HIT_REGEX, point)
 
         if not match:
             raise ValueError(f"Invalid point format: {point}")
 
         groups = match.groupdict()
         if groups["letters"]:
-            return f"{groups['letters'].lower()}{groups['numbers']}"
+            return f"{groups['letters'].upper()}{groups['numbers']}"
         else:
-            return f"{groups['letters_second'].lower()}{groups['numbers_first']}"
+            return f"{groups['letters_second'].upper()}{groups['numbers_first']}"
 
     def generate_heatmap_data(self) -> list[list[int]]:
         """Generate a 2D list representing the heatmap data.

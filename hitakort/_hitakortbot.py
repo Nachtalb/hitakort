@@ -11,7 +11,7 @@ from telegram.error import BadRequest
 from telegram.ext import Application, CommandHandler, ContextTypes, ExtBot, MessageHandler, filters
 
 from hitakort._hitakort import HitaKort
-from hitakort.defaults import CWD
+from hitakort.defaults import CWD, HIT_REGEX
 from hitakort.utils import sel
 
 
@@ -33,7 +33,7 @@ class HitaKortBot:
         self.hitakorts: dict[int, HitaKort] = {}
 
     def setup_hooks(self, application: Application) -> None:  # type: ignore[type-arg]
-        hit_filter = filters.Regex(r"([a-bA-Z][0-9]|[0-9][a-zA-Z)")
+        hit_filter = filters.Regex(HIT_REGEX)
         admin_filter = None
 
         if self.lock_to_admins and self.admins:
@@ -70,7 +70,7 @@ class HitaKortBot:
 
         👋 Hello! I'm HitaKort Bot. <i>Hita</i> is Old Norse for <code>heat</code> and <i>Kort</i> is Old Norse for <code>Map</code>. Giving me hits on a 6x6 grid I will return a heatmap where the hits are located most frequently.
 
-        🎉 First send me the grid size you want with /size <num>. Then send me a hit in the format of ROW COLUMN where ROW is a letter and COLUMN is a number. For example: A1, B2, C3, etc.
+        🎉 First send me the grid size you want with /size &lt;num&gt;. Then send me a hit in the format of ROW COLUMN where ROW is a letter and COLUMN is a number. For example: A1, B2, C3, etc.
         """
 
         await update.message.reply_text(sel(text), parse_mode=ParseMode.HTML)
@@ -93,7 +93,7 @@ class HitaKortBot:
         if not context.args:
             text = """<b>Set Grid Size</b>
 
-            🤔 You need to specify the grid size with /size <num>. For example: /size 6.
+            🤔 You need to specify the grid size with /size &lt;num&gt;. For example: /size 6.
             """
             await update.message.reply_text(sel(text), parse_mode=ParseMode.HTML)
             return
@@ -120,6 +120,12 @@ class HitaKortBot:
 
         self.hitakorts[user_id] = HitaKort(self.hitakort_path / (str(user_id) + ".json"), size)
 
+        text = f"""<b>Grid Size Set</b>
+
+        🎉 The grid size has been set to {size}. You can now start adding hits to the grid.
+        """
+        await update.message.reply_text(sel(text), parse_mode=ParseMode.HTML)
+
     async def heatmap(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not update.message or not update.effective_user:
             return
@@ -130,7 +136,7 @@ class HitaKortBot:
         if user_id not in self.hitakorts:
             text = """<b>Grid Size Not Set</b>
 
-            🤔 You need to set the grid size first with /size <num>.
+            🤔 You need to set the grid size first with /size &lt;num&gt;.
             """
             await update.message.reply_text(sel(text), parse_mode=ParseMode.HTML)
             return
@@ -153,7 +159,7 @@ class HitaKortBot:
         if user_id not in self.hitakorts:
             text = """<b>Grid Size Not Set</b>
 
-            🤔 You need to set the grid size first with /size <num>.
+            🤔 You need to set the grid size first with /size &lt;num&gt;.
             """
             await update.message.reply_text(sel(text), parse_mode=ParseMode.HTML)
             return
@@ -163,7 +169,7 @@ class HitaKortBot:
 
         text = """<b>Grid Reset</b>
 
-        🎉 The grid has been reset. You can now set the grid size with /size <num>.
+        🎉 The grid has been reset. You can now set the grid size with /size &lt;num&gt;.
         """
         await update.message.reply_text(sel(text), parse_mode=ParseMode.HTML)
 
@@ -177,7 +183,7 @@ class HitaKortBot:
         if user_id not in self.hitakorts:
             text = """<b>Grid Size Not Set</b>
 
-            🤔 You need to set the grid size first with /size <num>.
+            🤔 You need to set the grid size first with /size &lt;num&gt;.
             """
             await update.message.reply_text(sel(text), parse_mode=ParseMode.HTML)
             return
@@ -244,6 +250,10 @@ class HitaKortBot:
                 await self.bot.send_message(admin, "Bot started!")
             except BadRequest as e:
                 self.logger.error(f"Failed to send message to admin: {admin}, error: {e}")
+
+        for file in self.hitakort_path.glob("*.json"):
+            user_id = int(file.stem)
+            self.hitakorts[user_id] = HitaKort(file)
 
     async def post_stop(self, app: Application) -> None:  # type: ignore[type-arg]
         for admin in self.admins:
